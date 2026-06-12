@@ -20,6 +20,7 @@ from .const import (
     CONF_OPENID,
     CONF_TENANT_ID,
     CONF_UTOKEN,
+    CONF_CTOKEN,
     DOMAIN,
 )
 
@@ -138,20 +139,20 @@ class ShenzhenWaterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                             # 第一版先默认取第一个绑定户号。
                             customer = users[0]
                             customer_code = str(customer.get("customerCode") or "")
-
+                            
                             if not customer_code:
                                 _LOGGER.error(
                                     "customerCode not found in user data: %s",
                                     customer,
                                 )
                                 errors["base"] = "no_customer"
-
+                            
                             else:
-                                latest_result = await api.async_get_latest_bill_details(
-                                    customer_code
-                                )
+                                ctoken = await api.async_generate_ctoken(customer_code)
+                            
+                                latest_result = await api.async_get_latest_bill_details(customer_code)
                                 latest_rows = latest_result.get("data") or []
-
+                            
                                 if not latest_rows:
                                     _LOGGER.error(
                                         "No latest bill found: %s",
@@ -161,7 +162,7 @@ class ShenzhenWaterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                                 else:
                                     latest_bill = latest_rows[0]
                                     bill_month = latest_bill.get("costDate")
-
+                            
                                     if not bill_month:
                                         _LOGGER.error(
                                             "costDate not found in latest bill: %s",
@@ -170,12 +171,12 @@ class ShenzhenWaterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                                         errors["base"] = "no_latest_bill"
                                     else:
                                         bill_month = int(bill_month)
-
+                            
                                         await self.async_set_unique_id(customer_code)
                                         self._abort_if_unique_id_configured()
-
+                            
                                         title_name = customer.get("customerName") or customer_code
-
+                            
                                         return self.async_create_entry(
                                             title=f"深圳水务 {title_name}",
                                             data={
@@ -187,35 +188,36 @@ class ShenzhenWaterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                                                 CONF_TENANT_ID: self._tenant_id,
                                                 CONF_CUSTOMER_CODE: customer_code,
                                                 CONF_BILL_MONTH: bill_month,
+                                                CONF_CTOKEN: ctoken,
                                             },
                                         )
-
-                except ShenzhenWaterApiError as err:
-                    _LOGGER.exception("Shenzhen Water login/config failed: %s", err)
-                    errors["base"] = "api_error"
-
-                except (ClientError, TimeoutError) as err:
-                    _LOGGER.exception("Network error during Shenzhen Water login: %s", err)
-                    errors["base"] = "cannot_connect"
-
-                except Exception as err:  # noqa: BLE001
-                    _LOGGER.exception("Unexpected error during Shenzhen Water login: %s", err)
-                    errors["base"] = "unknown"
-
-        data_schema = vol.Schema(
-            {
-                vol.Required("sms_code"): str,
-            }
-        )
-
-        return self.async_show_form(
-            step_id="sms",
-            data_schema=data_schema,
-            errors=errors,
-            description_placeholders={
-                "mobile": self._mobile or "",
-            },
-        )
+                            
+                                            except ShenzhenWaterApiError as err:
+                                                _LOGGER.exception("Shenzhen Water login/config failed: %s", err)
+                                                errors["base"] = "api_error"
+                            
+                                            except (ClientError, TimeoutError) as err:
+                                                _LOGGER.exception("Network error during Shenzhen Water login: %s", err)
+                                                errors["base"] = "cannot_connect"
+                            
+                                            except Exception as err:  # noqa: BLE001
+                                                _LOGGER.exception("Unexpected error during Shenzhen Water login: %s", err)
+                                                errors["base"] = "unknown"
+                            
+                                    data_schema = vol.Schema(
+                                        {
+                                            vol.Required("sms_code"): str,
+                                        }
+                                    )
+                            
+                                    return self.async_show_form(
+                                        step_id="sms",
+                                        data_schema=data_schema,
+                                        errors=errors,
+                                        description_placeholders={
+                                            "mobile": self._mobile or "",
+                                        },
+                                    )
 
     @staticmethod
     @callback

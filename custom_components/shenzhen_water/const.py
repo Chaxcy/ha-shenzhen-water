@@ -7,6 +7,11 @@ API_URL_LOGIN = "https://szgk.sz-water.com.cn/api/wechat/op/user/LoginV20"
 API_URL_SEND_SMS_CODE = "https://szgk.sz-water.com.cn/api/wechat/op/user/GenerateValidationNumV20"
 API_URL_GET_USERS = "https://szgk.sz-water.com.cn/api/wechat/op/user/GetUsersV20"
 
+API_URL_CUS_GENERATE_CTOKEN = (
+    "https://szgk.sz-water.com.cn/api/wechat/op/CustomerInfo/"
+    "generaterCtoken"
+)
+
 API_URL_GET_LATEST_BILL = (
     "https://szgk.sz-water.com.cn/api/wechat/op/BillInfo/"
     "GetLatestBillDetails2V30"

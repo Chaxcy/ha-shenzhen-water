@@ -15,6 +15,7 @@ from .const import (
     CONF_BILL_MONTH,
     CONF_TENANT_ID,
     CONF_UTOKEN,
+    CONF_CTOKEN,
     CONF_APP_USER_ID,
 )
 from .coordinator import ShenzhenWaterCoordinator
@@ -37,6 +38,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         bill_month=entry.data[CONF_BILL_MONTH],
         utoken=entry.data[CONF_UTOKEN],
         app_user_id=entry.data.get(CONF_APP_USER_ID, ""),
+        ctoken=entry.data.get(CONF_CTOKEN, ""),
     )
 
     coordinator = ShenzhenWaterCoordinator(hass, api)
