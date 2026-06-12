@@ -16,6 +16,27 @@ from .const import DEFAULT_UPDATE_INTERVAL_MINUTES, DOMAIN
 _LOGGER = logging.getLogger(__name__)
 
 
+def _previous_yyyymm(value: int | str | None) -> int | None:
+    """Return previous yyyymm."""
+    if not value:
+        return None
+
+    value = str(value)
+    if len(value) != 6:
+        return None
+
+    try:
+        year = int(value[:4])
+        month = int(value[4:6])
+    except ValueError:
+        return None
+
+    if month == 1:
+        return (year - 1) * 100 + 12
+
+    return year * 100 + month - 1
+
+
 class ShenzhenWaterCoordinator(DataUpdateCoordinator):
     """Shenzhen Water data coordinator."""
 
@@ -37,7 +58,7 @@ class ShenzhenWaterCoordinator(DataUpdateCoordinator):
     async def _async_update_data(self):
         """Fetch latest data."""
         try:
-            current = await self.api.async_get_bill_info()
+            current = await self.api.async_get_latest_bill_details()
 
             current_bill = {}
             rows = current.get("data") or []
@@ -45,7 +66,9 @@ class ShenzhenWaterCoordinator(DataUpdateCoordinator):
                 current_bill = rows[0]
 
             previous = None
-            previous_month = current_bill.get("prebillmonth")
+            previous_month = current_bill.get("prebillmonth") or _previous_yyyymm(
+                current_bill.get("costDate")
+            )
 
             if previous_month:
                 try:
