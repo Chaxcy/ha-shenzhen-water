@@ -224,6 +224,8 @@ class ShenzhenWaterApi:
         payload = {
             "validationType": 4,
             "mobile": mobile,
+            "phoneOld": mobile,
+            "channel": DEFAULT_CHANNEL,
         }
 
         return await self._async_post_encrypted(
@@ -244,9 +246,12 @@ class ShenzhenWaterApi:
         """Login with mobile SMS code."""
         payload = {
             "mobile": mobile,
+            "phoneOld": mobile,
             "code": sms_code,
+            "validationNum": sms_code,
             "validationType": 4,
             "openid": mobile,
+            "channel": DEFAULT_CHANNEL,
         }
 
         return await self._async_post_encrypted(

@@ -41,9 +41,7 @@ class ShenzhenWaterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             self._mobile = str(user_input[CONF_MOBILE]).strip()
-            self._tenant_id = str(
-                user_input.get(CONF_TENANT_ID) or DEFAULT_TENANT_ID
-            ).strip()
+            self._tenant_id = DEFAULT_TENANT_ID
 
             try:
                 session = async_get_clientsession(self.hass)
@@ -72,7 +70,6 @@ class ShenzhenWaterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         data_schema = vol.Schema(
             {
                 vol.Required(CONF_MOBILE): str,
-                vol.Required(CONF_TENANT_ID, default=DEFAULT_TENANT_ID): str,
             }
         )
 

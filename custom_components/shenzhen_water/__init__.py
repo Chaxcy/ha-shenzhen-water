@@ -15,6 +15,7 @@ from .const import (
     CONF_BILL_MONTH,
     CONF_TENANT_ID,
     CONF_UTOKEN,
+    CONF_APP_USER_ID,
 )
 from .coordinator import ShenzhenWaterCoordinator
 
@@ -53,6 +54,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
     if unload_ok:
-        hass.data[DOMAIN].pop(entry.entry_id)
+        hass.data[DOMAIN].pop(entry.entry_id, None)
 
     return unload_ok
