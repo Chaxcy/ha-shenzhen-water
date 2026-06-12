@@ -16,27 +16,6 @@ from .const import DEFAULT_UPDATE_INTERVAL_MINUTES, DOMAIN
 _LOGGER = logging.getLogger(__name__)
 
 
-def _previous_yyyymm(value: int | str | None) -> int | None:
-    """Return previous yyyymm."""
-    if not value:
-        return None
-
-    value = str(value)
-    if len(value) != 6:
-        return None
-
-    try:
-        year = int(value[:4])
-        month = int(value[4:6])
-    except ValueError:
-        return None
-
-    if month == 1:
-        return (year - 1) * 100 + 12
-
-    return year * 100 + month - 1
-
-
 class ShenzhenWaterCoordinator(DataUpdateCoordinator):
     """Shenzhen Water data coordinator."""
 
@@ -58,17 +37,21 @@ class ShenzhenWaterCoordinator(DataUpdateCoordinator):
     async def _async_update_data(self):
         """Fetch latest data."""
         try:
+            # 用 GetLatestBillDetails2V30 作为当前账单数据源。
+            # 这个接口字段更完整，包含 dueDate / paymentStatus / meterWaterUses 等。
             current = await self.api.async_get_latest_bill_details()
 
-            current_bill = {}
-            rows = current.get("data") or []
-            if rows:
-                current_bill = rows[0]
+            # 再请求一次当前月份的 BillingInfo，用来拿 prebillmonth。
+            # 这个接口虽然当前字段不够全，但能提供上期月份。
+            current_bill_info = await self.api.async_get_bill_info()
+
+            current_bill_for_previous = {}
+            bill_info_rows = current_bill_info.get("data") or []
+            if bill_info_rows:
+                current_bill_for_previous = bill_info_rows[0]
 
             previous = None
-            previous_month = current_bill.get("prebillmonth") or _previous_yyyymm(
-                current_bill.get("costDate")
-            )
+            previous_month = current_bill_for_previous.get("prebillmonth")
 
             if previous_month:
                 try:
@@ -81,6 +64,7 @@ class ShenzhenWaterCoordinator(DataUpdateCoordinator):
             return {
                 "current": current,
                 "previous": previous,
+                "current_bill_info": current_bill_info,
             }
 
         except ShenzhenWaterAuthExpiredError as err:
