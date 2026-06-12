@@ -241,4 +241,3 @@ class ShenzhenWaterOptionsFlow(config_entries.OptionsFlow):
             data_schema=vol.Schema({}),
             errors={},
         )
-```
