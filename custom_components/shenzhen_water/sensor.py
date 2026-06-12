@@ -108,6 +108,31 @@ SENSORS: tuple[ShenzhenWaterSensorDescription, ...] = (
         name="缴费状态",
         value_fn=lambda c: c.bill.get("paymentStatus"),
     ),
+        ShenzhenWaterSensorDescription(
+        key="previous_period_usage",
+        translation_key="previous_period_usage",
+        name="上期用水量",
+        native_unit_of_measurement=UnitOfVolume.CUBIC_METERS,
+        device_class=SensorDeviceClass.WATER,
+        state_class=SensorStateClass.TOTAL,
+        value_fn=lambda c: c.previous_bill.get("waterConsumption")
+        or c.meter.get("waterConsumptionPre"),
+    ),
+    ShenzhenWaterSensorDescription(
+        key="previous_total_amount",
+        translation_key="previous_total_amount",
+        name="上期总费用",
+        native_unit_of_measurement="CNY",
+        device_class=SensorDeviceClass.MONETARY,
+        state_class=SensorStateClass.TOTAL,
+        value_fn=lambda c: c.previous_bill.get("totalAmount"),
+    ),
+    ShenzhenWaterSensorDescription(
+        key="previous_bill_month",
+        translation_key="previous_bill_month",
+        name="上期账单月份",
+        value_fn=lambda c: c.previous_bill.get("costDate") or c.bill.get("prebillmonth"),
+    ),
 )
 
 

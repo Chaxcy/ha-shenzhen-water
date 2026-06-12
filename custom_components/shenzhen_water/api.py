@@ -3,13 +3,28 @@ from __future__ import annotations
 import base64
 import json
 import re
+import secrets
+import string
 from typing import Any
 
 from aiohttp import ClientSession
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
 
-from .const import API_URL_BILL_INFO, DEFAULT_CHANNEL
+from .const import (
+    API_URL_BILL_INFO,
+    API_URL_GET_LATEST_BILL,
+    API_URL_GET_USERS,
+    API_URL_LOGIN,
+    API_URL_SEND_SMS_CODE,
+    DEFAULT_CHANNEL,
+)
+
+
+def generate_header_value(length: int = 32) -> str:
+    """Generate random 04A52C9F request header value."""
+    chars = string.ascii_letters + string.digits
+    return "".join(secrets.choice(chars) for _ in range(length))
 
 
 class ShenzhenWaterApiError(Exception):
@@ -22,28 +37,32 @@ class ShenzhenWaterApi:
     def __init__(
         self,
         session: ClientSession,
-        openid: str,
-        guid: str,
-        customer_code: str,
-        bill_month: int,
         tenant_id: str,
-        utoken: str,
-        request_header_value: str,
+        openid: str = "",
+        guid: str = "",
+        customer_code: str = "",
+        bill_month: int = 0,
+        utoken: str = "",
+        app_user_id: str = "",
+        ctoken: str = "",
     ) -> None:
         self._session = session
+        self._tenant_id = tenant_id
         self._openid = openid
         self._guid = guid
         self._customer_code = customer_code
         self._bill_month = bill_month
-        self._tenant_id = tenant_id
         self._utoken = utoken
-        self._request_header_value = request_header_value
+        self._app_user_id = app_user_id
+        self._ctoken = ctoken
 
     @staticmethod
     def make_key(header_value: str) -> str:
         """Generate AES key from 04A52C9F header value."""
         if not header_value or len(header_value) < 24:
-            raise ShenzhenWaterApiError(f"Invalid 04A52C9F header value: {header_value}")
+            raise ShenzhenWaterApiError(
+                f"Invalid 04A52C9F header value: {header_value}"
+            )
 
         return "33F4A3D6" + header_value[8:24] + "A9E19798"
 
@@ -65,12 +84,21 @@ class ShenzhenWaterApi:
 
         raw = base64.b64decode(cipher_text)
 
+        if len(raw) % 16 != 0:
+            raise ShenzhenWaterApiError(
+                f"Invalid AES payload length: {len(raw)}, not aligned to 16 bytes"
+            )
+
         cipher = AES.new(key.encode("utf-8"), AES.MODE_ECB)
         plain = unpad(cipher.decrypt(raw), AES.block_size)
         return plain.decode("utf-8")
 
     @classmethod
-    def decrypt_response(cls, resp_text: str, response_header_value: str) -> dict[str, Any]:
+    def decrypt_response(
+        cls,
+        resp_text: str,
+        response_header_value: str,
+    ) -> dict[str, Any]:
         """
         Decrypt Shenzhen Water response.
 
@@ -88,7 +116,13 @@ class ShenzhenWaterApi:
         except Exception:
             t = resp_text.strip().strip('"')
 
+        if not isinstance(t, str):
+            raise ShenzhenWaterApiError("Encrypted response is not a string")
+
         t = re.sub(r"\s+", "", t)
+
+        if len(t) <= 20:
+            raise ShenzhenWaterApiError("Invalid encrypted response length")
 
         s = t[:7]
         n = t[7:20]
@@ -96,43 +130,69 @@ class ShenzhenWaterApi:
 
         response_key = cls.make_key(response_header_value)
         plain = cls.decrypt_aes_ecb_raw(cipher_text, response_key)
-        return json.loads(plain)
 
-    def _build_payload(self) -> dict[str, Any]:
-        return {
-            "customerCodes": [
-                {
-                    "customercode": self._customer_code,
-                    "billmonth": self._bill_month,
-                }
-            ],
-            "channel": DEFAULT_CHANNEL,
-            "openid": self._openid,
-            "guid": self._guid,
-        }
+        try:
+            return json.loads(plain)
+        except json.JSONDecodeError as err:
+            raise ShenzhenWaterApiError(f"Invalid decrypted JSON: {plain}") from err
 
-    def _build_headers(self) -> dict[str, str]:
-        return {
-            "04A52C9F": self._request_header_value,
+    def _build_common_headers(
+        self,
+        request_header_value: str,
+        *,
+        openid: str | None = None,
+        utoken: str | None = None,
+        ctoken: str | None = None,
+    ) -> dict[str, str]:
+        """Build common Shenzhen Water request headers."""
+        headers = {
+            "04A52C9F": request_header_value,
             "Accept": "application/json, text/plain, */*",
             "Channel": DEFAULT_CHANNEL,
             "Content-Type": "application/json;charset=UTF-8",
-            "OpenId": self._openid,
+            "OpenId": openid if openid is not None else self._openid,
             "Origin": "https://www.82137777.com",
             "Referer": "https://www.82137777.com/",
             "TenantId": self._tenant_id,
-            "Utoken": self._utoken,
             "User-Agent": "Mozilla/5.0",
         }
 
-    async def async_get_bill_info(self) -> dict[str, Any]:
-        """Fetch bill info."""
-        request_key = self.make_key(self._request_header_value)
-        encrypted_payload = self.encrypt_aes_ecb(self._build_payload(), request_key)
+        final_utoken = utoken if utoken is not None else self._utoken
+        final_ctoken = ctoken if ctoken is not None else self._ctoken
+
+        if final_utoken:
+            headers["Utoken"] = final_utoken
+
+        if final_ctoken:
+            headers["Ctoken"] = final_ctoken
+
+        return headers
+
+    async def _async_post_encrypted(
+        self,
+        url: str,
+        payload: dict[str, Any],
+        *,
+        openid: str | None = None,
+        utoken: str | None = None,
+        ctoken: str | None = None,
+    ) -> dict[str, Any]:
+        """POST encrypted payload and decrypt encrypted response."""
+        request_header_value = generate_header_value()
+        request_key = self.make_key(request_header_value)
+
+        encrypted_payload = self.encrypt_aes_ecb(payload, request_key)
+
+        headers = self._build_common_headers(
+            request_header_value,
+            openid=openid,
+            utoken=utoken,
+            ctoken=ctoken,
+        )
 
         async with self._session.post(
-            API_URL_BILL_INFO,
-            headers=self._build_headers(),
+            url,
+            headers=headers,
             data=encrypted_payload,
             timeout=15,
         ) as resp:
@@ -148,6 +208,154 @@ class ShenzhenWaterApi:
             data = self.decrypt_response(text, response_header_value)
 
             if data.get("code") != 0:
-                raise ShenzhenWaterApiError(data.get("message", "Unknown API error"))
+                raise ShenzhenWaterApiError(
+                    data.get("message") or data.get("msg") or "Unknown API error"
+                )
 
             return data
+
+    async def async_send_sms_code(
+        self,
+        mobile: str,
+        ctoken: str | None = None,
+        old_utoken: str | None = None,
+    ) -> dict[str, Any]:
+        """Send SMS validation code."""
+        payload = {
+            "validationType": 4,
+            "mobile": mobile,
+        }
+
+        return await self._async_post_encrypted(
+            API_URL_SEND_SMS_CODE,
+            payload,
+            openid="",
+            utoken=old_utoken or "",
+            ctoken=ctoken or "",
+        )
+
+    async def async_login_v20(
+        self,
+        mobile: str,
+        sms_code: str,
+        ctoken: str | None = None,
+        old_utoken: str | None = None,
+    ) -> dict[str, Any]:
+        """Login with mobile SMS code."""
+        payload = {
+            "mobile": mobile,
+            "code": sms_code,
+            "validationType": 4,
+            "openid": mobile,
+        }
+
+        return await self._async_post_encrypted(
+            API_URL_LOGIN,
+            payload,
+            openid="",
+            utoken=old_utoken or "",
+            ctoken=ctoken or "",
+        )
+
+    async def async_get_users_v20(self) -> dict[str, Any]:
+        """Fetch bound water customer list."""
+        if not self._openid:
+            raise ShenzhenWaterApiError("openid is required")
+
+        if not self._guid:
+            raise ShenzhenWaterApiError("guid is required")
+
+        if not self._utoken:
+            raise ShenzhenWaterApiError("utoken is required")
+
+        payload = {
+            "channel": DEFAULT_CHANNEL,
+            "openid": self._openid,
+            "guid": self._guid,
+        }
+
+        return await self._async_post_encrypted(
+            API_URL_GET_USERS,
+            payload,
+            openid=self._openid,
+            utoken=self._utoken,
+            ctoken=self._ctoken or None,
+        )
+
+    async def async_get_latest_bill_details(
+        self,
+        customer_code: str | None = None,
+    ) -> dict[str, Any]:
+        """Fetch latest bill details."""
+        if not self._openid:
+            raise ShenzhenWaterApiError("openid is required")
+
+        if not self._guid:
+            raise ShenzhenWaterApiError("guid is required")
+
+        if not self._utoken:
+            raise ShenzhenWaterApiError("utoken is required")
+
+        target_customer_code = customer_code or self._customer_code
+        if not target_customer_code:
+            raise ShenzhenWaterApiError("customer_code is required")
+
+        payload = {
+            "customerCode": target_customer_code,
+            "channel": DEFAULT_CHANNEL,
+            "openid": self._openid,
+            "guid": self._guid,
+        }
+
+        return await self._async_post_encrypted(
+            API_URL_GET_LATEST_BILL,
+            payload,
+            openid=self._openid,
+            utoken=self._utoken,
+            ctoken=None,
+        )
+
+    def _build_bill_payload(self, bill_month: int | None = None) -> dict[str, Any]:
+        """Build encrypted bill request payload."""
+        if not self._customer_code:
+            raise ShenzhenWaterApiError("customer_code is required")
+
+        if not self._openid:
+            raise ShenzhenWaterApiError("openid is required")
+
+        if not self._guid:
+            raise ShenzhenWaterApiError("guid is required")
+
+        target_bill_month = bill_month or self._bill_month
+        if not target_bill_month:
+            raise ShenzhenWaterApiError("bill_month is required")
+
+        return {
+            "customerCodes": [
+                {
+                    "customercode": self._customer_code,
+                    "billmonth": target_bill_month,
+                }
+            ],
+            "channel": DEFAULT_CHANNEL,
+            "openid": self._openid,
+            "guid": self._guid,
+        }
+
+    async def async_get_bill_info(
+        self,
+        bill_month: int | None = None,
+    ) -> dict[str, Any]:
+        """Fetch bill info."""
+        if not self._utoken:
+            raise ShenzhenWaterApiError("utoken is required")
+
+        payload = self._build_bill_payload(bill_month)
+
+        return await self._async_post_encrypted(
+            API_URL_BILL_INFO,
+            payload,
+            openid=self._openid,
+            utoken=self._utoken,
+            ctoken=None,
+        )

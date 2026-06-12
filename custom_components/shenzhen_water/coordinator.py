@@ -26,21 +26,62 @@ class ShenzhenWaterCoordinator(DataUpdateCoordinator):
 
     async def _async_update_data(self):
         """Fetch latest data."""
-        return await self.api.async_get_bill_info()
+        current = await self.api.async_get_bill_info()
+    
+        current_bill = {}
+        rows = current.get("data") or []
+        if rows:
+            current_bill = rows[0]
+    
+        previous = None
+        previous_month = current_bill.get("prebillmonth")
+    
+        if previous_month:
+            try:
+                previous = await self.api.async_get_bill_info(previous_month)
+            except Exception as err:
+                _LOGGER.warning("Failed to fetch previous bill: %s", err)
+    
+        return {
+            "current": current,
+            "previous": previous,
+        }
 
     @property
     def bill(self) -> dict:
-        """Return first bill item."""
+        """Return current bill item."""
         data = self.data or {}
-        rows = data.get("data") or []
+        current = data.get("current") or {}
+        rows = current.get("data") or []
         if not rows:
             return {}
         return rows[0]
-
+    
+    
     @property
     def meter(self) -> dict:
-        """Return first meter item."""
+        """Return current meter item."""
         bill = self.bill
+        meters = bill.get("meterWaterUses") or []
+        if not meters:
+            return {}
+        return meters[0]
+
+    @property
+    def previous_bill(self) -> dict:
+        """Return previous bill item."""
+        data = self.data or {}
+        previous = data.get("previous") or {}
+        rows = previous.get("data") or []
+        if not rows:
+            return {}
+        return rows[0]
+    
+    
+    @property
+    def previous_meter(self) -> dict:
+        """Return previous meter item."""
+        bill = self.previous_bill
         meters = bill.get("meterWaterUses") or []
         if not meters:
             return {}
