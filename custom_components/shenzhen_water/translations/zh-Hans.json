@@ -1,0 +1,49 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "深圳水务",
+        "description": "请输入深圳水务绑定的手机号，并设置数据同步间隔。",
+        "data": {
+          "mobile": "手机号",
+          "update_interval_minutes": "同步间隔（分钟）"
+        }
+      },
+      "sms": {
+        "title": "短信验证码",
+        "description": "验证码已发送到 {mobile}，请输入短信验证码完成登录。",
+        "data": {
+          "sms_code": "短信验证码"
+        }
+      }
+    },
+    "error": {
+      "send_sms_failed": "短信验证码发送失败",
+      "cannot_connect": "无法连接深圳水务服务器",
+      "unknown": "未知错误",
+      "missing_mobile": "缺少手机号",
+      "login_failed": "登录失败，请检查验证码",
+      "no_customer": "没有找到绑定的水务户号",
+      "no_latest_bill": "没有找到最新账单",
+      "api_error": "深圳水务接口错误",
+      "invalid_update_interval": "同步间隔不合法"
+    },
+    "abort": {
+      "already_configured": "该户号已经添加"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "深圳水务设置",
+        "description": "设置数据同步间隔。",
+        "data": {
+          "update_interval_minutes": "同步间隔（分钟）"
+        }
+      }
+    },
+    "error": {
+      "invalid_update_interval": "同步间隔不合法"
+    }
+  }
+}
