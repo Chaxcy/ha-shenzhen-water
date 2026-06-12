@@ -193,9 +193,15 @@ class ShenzhenWaterApi:
             text = await resp.text()
 
             if resp.status != 200:
-                raise ShenzhenWaterApiError(
-                    f"HTTP {resp.status}: url={url}, response={text}"
-                )
+                error_message = f"HTTP {resp.status}: url={url}, response={text}"
+        
+                if self._is_utoken_error_message(error_message):
+                    raise ShenzhenWaterAuthExpiredError(
+                        "深圳水务登录已失效，请删除该集成配置项后重新添加，"
+                        f"重新获取短信验证码登录。原始错误：{error_message}"
+                    )
+        
+                raise ShenzhenWaterApiError(error_message)
 
             response_header_value = resp.headers.get("04A52C9F")
             if not response_header_value:
