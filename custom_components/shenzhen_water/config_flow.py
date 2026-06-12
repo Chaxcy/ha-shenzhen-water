@@ -206,13 +206,8 @@ class ShenzhenWaterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                                         await self.async_set_unique_id(customer_code)
                                         self._abort_if_unique_id_configured()
 
-                                        title_name = (
-                                            customer.get("customerName")
-                                            or customer_code
-                                        )
-
                                         return self.async_create_entry(
-                                            title=f"深圳水务 {title_name}",
+                                            title=f"深圳水务 {customer_code}",
                                             data={
                                                 CONF_MOBILE: self._mobile,
                                                 CONF_OPENID: openid,
