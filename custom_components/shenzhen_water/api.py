@@ -31,6 +31,8 @@ def generate_header_value(length: int = 32) -> str:
 class ShenzhenWaterApiError(Exception):
     """Shenzhen Water API error."""
 
+class ShenzhenWaterAuthExpiredError(ShenzhenWaterApiError):
+    """Shenzhen Water login token expired."""
 
 class ShenzhenWaterApi:
     """Shenzhen Water API client."""
@@ -205,7 +207,7 @@ class ShenzhenWaterApi:
 
             api_code = data.get("code")
             if api_code not in (0, "0"):
-                raise ShenzhenWaterApiError(
+                error_message = (
                     "API error, "
                     f"url={url}, "
                     f"code={api_code}, "
@@ -214,7 +216,91 @@ class ShenzhenWaterApi:
                     f"response={json.dumps(data, ensure_ascii=False)}"
                 )
 
+                if self._is_utoken_error_message(error_message):
+                    raise ShenzhenWaterAuthExpiredError(
+                        "深圳水务登录已失效，请删除该集成配置项后重新添加，"
+                        f"重新获取短信验证码登录。原始错误：{error_message}"
+                    )
+
+                raise ShenzhenWaterApiError(error_message)
+
             return data
+
+    @staticmethod
+    def _is_ctoken_error(err: Exception) -> bool:
+        """Return true if the API error looks like a Ctoken problem."""
+        message = str(err).lower()
+
+        return any(
+            keyword.lower() in message
+            for keyword in (
+                "ctoken",
+                "9999902",
+                "请求头ctoken",
+                "ctoken参数缺失",
+                "ctoken信息不合法",
+            )
+        )
+
+    @staticmethod
+    def _is_utoken_error_message(message: str) -> bool:
+        """Return true if the API error looks like an expired or invalid Utoken."""
+        lowered = message.lower()
+
+        # Ctoken errors should be handled by Ctoken retry, not treated as login expired.
+        if "ctoken" in lowered:
+            return False
+
+        return any(
+            keyword.lower() in lowered
+            for keyword in (
+                "9999904",
+                "utoken",
+                "请求头token信息不合法",
+                "token信息不合法",
+                "token不合法",
+                "登录失效",
+                "未登录",
+            )
+        )
+
+    async def _async_post_with_ctoken_retry(
+        self,
+        url: str,
+        payload: dict[str, Any],
+        *,
+        customer_code: str,
+    ) -> dict[str, Any]:
+        """POST with Ctoken and retry once if Ctoken is missing, invalid, or expired."""
+        if not customer_code:
+            raise ShenzhenWaterApiError("customer_code is required")
+
+        if not self._ctoken:
+            await self.async_generate_ctoken(customer_code)
+
+        try:
+            return await self._async_post_encrypted(
+                url,
+                payload,
+                openid=self._openid,
+                utoken=self._utoken,
+                ctoken=self._ctoken,
+            )
+
+        except ShenzhenWaterApiError as err:
+            if not self._is_ctoken_error(err):
+                raise
+
+            self._ctoken = ""
+            await self.async_generate_ctoken(customer_code)
+
+            return await self._async_post_encrypted(
+                url,
+                payload,
+                openid=self._openid,
+                utoken=self._utoken,
+                ctoken=self._ctoken,
+            )
 
     async def async_send_sms_code(
         self,
@@ -346,9 +432,6 @@ class ShenzhenWaterApi:
         if not target_customer_code:
             raise ShenzhenWaterApiError("customer_code is required")
 
-        if not self._ctoken:
-            await self.async_generate_ctoken(target_customer_code)
-
         payload = {
             "customerType": "details",
             "customercodelist": [target_customer_code],
@@ -357,12 +440,10 @@ class ShenzhenWaterApi:
             "guid": self._guid,
         }
 
-        return await self._async_post_encrypted(
+        return await self._async_post_with_ctoken_retry(
             API_URL_GET_LATEST_BILL,
             payload,
-            openid=self._openid,
-            utoken=self._utoken,
-            ctoken=self._ctoken,
+            customer_code=target_customer_code,
         )
 
     def _build_bill_payload(self, bill_month: int | None = None) -> dict[str, Any]:
@@ -400,15 +481,10 @@ class ShenzhenWaterApi:
         if not self._utoken:
             raise ShenzhenWaterApiError("utoken is required")
 
-        if not self._ctoken:
-            await self.async_generate_ctoken(self._customer_code)
-
         payload = self._build_bill_payload(bill_month)
 
-        return await self._async_post_encrypted(
+        return await self._async_post_with_ctoken_retry(
             API_URL_BILL_INFO,
             payload,
-            openid=self._openid,
-            utoken=self._utoken,
-            ctoken=self._ctoken,
+            customer_code=self._customer_code,
         )

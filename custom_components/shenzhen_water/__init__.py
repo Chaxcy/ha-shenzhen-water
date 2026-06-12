@@ -8,15 +8,17 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import ShenzhenWaterApi
 from .const import (
-    DOMAIN,
-    CONF_OPENID,
-    CONF_GUID,
-    CONF_CUSTOMER_CODE,
-    CONF_BILL_MONTH,
-    CONF_TENANT_ID,
-    CONF_UTOKEN,
-    CONF_CTOKEN,
     CONF_APP_USER_ID,
+    CONF_BILL_MONTH,
+    CONF_CTOKEN,
+    CONF_CUSTOMER_CODE,
+    CONF_GUID,
+    CONF_OPENID,
+    CONF_TENANT_ID,
+    CONF_UPDATE_INTERVAL_MINUTES,
+    CONF_UTOKEN,
+    DEFAULT_UPDATE_INTERVAL_MINUTES,
+    DOMAIN,
 )
 from .coordinator import ShenzhenWaterCoordinator
 
@@ -41,10 +43,26 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         ctoken=entry.data.get(CONF_CTOKEN, ""),
     )
 
-    coordinator = ShenzhenWaterCoordinator(hass, api)
+    update_interval_minutes = int(
+        entry.options.get(
+            CONF_UPDATE_INTERVAL_MINUTES,
+            entry.data.get(
+                CONF_UPDATE_INTERVAL_MINUTES,
+                DEFAULT_UPDATE_INTERVAL_MINUTES,
+            ),
+        )
+    )
+
+    coordinator = ShenzhenWaterCoordinator(
+        hass,
+        api,
+        update_interval_minutes=update_interval_minutes,
+    )
     await coordinator.async_config_entry_first_refresh()
 
     hass.data[DOMAIN][entry.entry_id] = coordinator
+
+    entry.async_on_unload(entry.add_update_listener(async_reload_entry))
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
@@ -59,3 +77,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.data[DOMAIN].pop(entry.entry_id, None)
 
     return unload_ok
+
+
+async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Reload Shenzhen Water config entry."""
+    await async_unload_entry(hass, entry)
+    await async_setup_entry(hass, entry)

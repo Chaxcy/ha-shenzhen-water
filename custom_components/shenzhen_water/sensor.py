@@ -4,9 +4,9 @@ from dataclasses import dataclass
 from typing import Any, Callable
 
 from homeassistant.components.sensor import (
+    SensorDeviceClass,
     SensorEntity,
     SensorEntityDescription,
-    SensorDeviceClass,
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
@@ -15,7 +15,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, CONF_CUSTOMER_CODE
+from .const import CONF_CUSTOMER_CODE, DOMAIN
 from .coordinator import ShenzhenWaterCoordinator
 
 
@@ -27,15 +27,30 @@ class ShenzhenWaterSensorDescription(SensorEntityDescription):
 
 
 SENSORS: tuple[ShenzhenWaterSensorDescription, ...] = (
+    # 账单基础信息
     ShenzhenWaterSensorDescription(
-        key="water_meter_reading",
-        translation_key="water_meter_reading",
-        name="当前水表读数",
-        native_unit_of_measurement=UnitOfVolume.CUBIC_METERS,
-        device_class=SensorDeviceClass.WATER,
-        state_class=SensorStateClass.TOTAL_INCREASING,
-        value_fn=lambda c: c.meter.get("waterNumber"),
+        key="bill_month",
+        translation_key="bill_month",
+        name="账单月份",
+        icon="mdi:receipt-text",
+        value_fn=lambda c: c.bill.get("costDate"),
     ),
+    ShenzhenWaterSensorDescription(
+        key="payment_status",
+        translation_key="payment_status",
+        name="缴费状态",
+        icon="mdi:alert-circle-outline",
+        value_fn=lambda c: c.bill.get("paymentStatus"),
+    ),
+    ShenzhenWaterSensorDescription(
+        key="due_date",
+        translation_key="due_date",
+        name="到期日",
+        icon="mdi:calendar-clock",
+        value_fn=lambda c: c.bill.get("dueDate"),
+    ),
+
+    # 本期用水
     ShenzhenWaterSensorDescription(
         key="current_period_usage",
         translation_key="current_period_usage",
@@ -45,6 +60,17 @@ SENSORS: tuple[ShenzhenWaterSensorDescription, ...] = (
         state_class=SensorStateClass.TOTAL,
         value_fn=lambda c: c.bill.get("waterConsumption"),
     ),
+    ShenzhenWaterSensorDescription(
+        key="water_meter_reading",
+        translation_key="water_meter_reading",
+        name="当前水表读数",
+        native_unit_of_measurement=UnitOfVolume.CUBIC_METERS,
+        device_class=SensorDeviceClass.WATER,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        value_fn=lambda c: c.meter.get("waterNumber"),
+    ),
+
+    # 本期费用
     ShenzhenWaterSensorDescription(
         key="total_amount",
         translation_key="total_amount",
@@ -90,25 +116,17 @@ SENSORS: tuple[ShenzhenWaterSensorDescription, ...] = (
         state_class=SensorStateClass.TOTAL,
         value_fn=lambda c: c.bill.get("garbageAmount"),
     ),
+
+    # 上期账单
     ShenzhenWaterSensorDescription(
-        key="bill_month",
-        translation_key="bill_month",
-        name="账单月份",
-        value_fn=lambda c: c.bill.get("costDate"),
+        key="previous_bill_month",
+        translation_key="previous_bill_month",
+        name="上期账单月份",
+        icon="mdi:receipt-text-clock",
+        value_fn=lambda c: c.previous_bill.get("costDate")
+        or c.bill.get("prebillmonth"),
     ),
     ShenzhenWaterSensorDescription(
-        key="due_date",
-        translation_key="due_date",
-        name="到期日",
-        value_fn=lambda c: c.bill.get("dueDate"),
-    ),
-    ShenzhenWaterSensorDescription(
-        key="payment_status",
-        translation_key="payment_status",
-        name="缴费状态",
-        value_fn=lambda c: c.bill.get("paymentStatus"),
-    ),
-        ShenzhenWaterSensorDescription(
         key="previous_period_usage",
         translation_key="previous_period_usage",
         name="上期用水量",
@@ -126,12 +144,6 @@ SENSORS: tuple[ShenzhenWaterSensorDescription, ...] = (
         device_class=SensorDeviceClass.MONETARY,
         state_class=SensorStateClass.TOTAL,
         value_fn=lambda c: c.previous_bill.get("totalAmount"),
-    ),
-    ShenzhenWaterSensorDescription(
-        key="previous_bill_month",
-        translation_key="previous_bill_month",
-        name="上期账单月份",
-        value_fn=lambda c: c.previous_bill.get("costDate") or c.bill.get("prebillmonth"),
     ),
 )
 
@@ -170,6 +182,7 @@ class ShenzhenWaterSensor(CoordinatorEntity[ShenzhenWaterCoordinator], SensorEnt
             "identifiers": {(DOMAIN, customer_code)},
             "name": f"深圳水务 {customer_code}",
             "manufacturer": "Shenzhen Water",
+            "model": "Water Utility Account",
         }
 
     @property
