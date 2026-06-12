@@ -100,18 +100,7 @@ class ShenzhenWaterApi:
         resp_text: str,
         response_header_value: str,
     ) -> dict[str, Any]:
-        """
-        Decrypt Shenzhen Water response.
-
-        Frontend logic:
-            var t = e.data
-            var s = t.slice(0, 7)
-            var n = t.slice(7, 20)
-            var o = Hg(
-                s + t.substring(20) + n,
-                "33F4A3D6" + e.headers["04a52c9f"].substr(8, 16) + "A9E19798"
-            )
-        """
+        """Decrypt Shenzhen Water encrypted response."""
         try:
             t = json.loads(resp_text)
         except Exception:
@@ -123,7 +112,9 @@ class ShenzhenWaterApi:
         t = re.sub(r"\s+", "", t)
 
         if len(t) <= 20:
-            raise ShenzhenWaterApiError("Invalid encrypted response length")
+            raise ShenzhenWaterApiError(
+                f"Invalid encrypted response length: {len(t)}"
+            )
 
         s = t[:7]
         n = t[7:20]
@@ -200,17 +191,27 @@ class ShenzhenWaterApi:
             text = await resp.text()
 
             if resp.status != 200:
-                raise ShenzhenWaterApiError(f"HTTP {resp.status}: {text}")
+                raise ShenzhenWaterApiError(
+                    f"HTTP {resp.status}: url={url}, response={text}"
+                )
 
             response_header_value = resp.headers.get("04A52C9F")
             if not response_header_value:
-                raise ShenzhenWaterApiError("Response header 04A52C9F not found")
+                raise ShenzhenWaterApiError(
+                    f"Response header 04A52C9F not found: url={url}, response={text}"
+                )
 
             data = self.decrypt_response(text, response_header_value)
 
-            if data.get("code") != 0:
+            api_code = data.get("code")
+            if api_code not in (0, "0"):
                 raise ShenzhenWaterApiError(
-                    data.get("message") or data.get("msg") or "Unknown API error"
+                    "API error, "
+                    f"url={url}, "
+                    f"code={api_code}, "
+                    f"message={data.get('message')}, "
+                    f"msg={data.get('msg')}, "
+                    f"response={json.dumps(data, ensure_ascii=False)}"
                 )
 
             return data
@@ -225,7 +226,7 @@ class ShenzhenWaterApi:
         payload = {
             "validationType": 4,
             "mobile": mobile,
-            "customerType": login,
+            "customerType": "login",
             "channel": DEFAULT_CHANNEL,
         }
 
@@ -261,44 +262,6 @@ class ShenzhenWaterApi:
             ctoken=ctoken or "",
         )
 
-    async def async_generate_ctoken(
-        self,
-        customer_code: str | None = None,
-    ) -> str:
-        """Generate Ctoken for a customer code."""
-        target_customer_code = customer_code or self._customer_code
-    
-        if not target_customer_code:
-            raise ShenzhenWaterApiError("customer_code is required")
-    
-        if not self._openid:
-            raise ShenzhenWaterApiError("openid is required")
-    
-        if not self._utoken:
-            raise ShenzhenWaterApiError("utoken is required")
-    
-        payload = {
-            "customercode": target_customer_code,
-            "channel": DEFAULT_CHANNEL,
-            "openid": self._openid,
-        }
-    
-        data = await self._async_post_encrypted(
-            API_URL_CUS_GENERATE_CTOKEN,
-            payload,
-            openid=self._openid,
-            utoken=self._utoken,
-            ctoken=None,
-        )
-    
-        token = ((data.get("data") or {}).get("token")) or ""
-    
-        if not token:
-            raise ShenzhenWaterApiError(f"Ctoken not found in response: {data}")
-    
-        self._ctoken = token
-        return token
-
     async def async_get_users_v20(self) -> dict[str, Any]:
         """Fetch bound water customer list."""
         if not self._openid:
@@ -322,8 +285,48 @@ class ShenzhenWaterApi:
             payload,
             openid=self._openid,
             utoken=self._utoken,
-            ctoken=self._ctoken or None,
+            ctoken="",
         )
+
+    async def async_generate_ctoken(
+        self,
+        customer_code: str | None = None,
+    ) -> str:
+        """Generate Ctoken for a customer code."""
+        target_customer_code = customer_code or self._customer_code
+
+        if not target_customer_code:
+            raise ShenzhenWaterApiError("customer_code is required")
+
+        if not self._openid:
+            raise ShenzhenWaterApiError("openid is required")
+
+        if not self._utoken:
+            raise ShenzhenWaterApiError("utoken is required")
+
+        payload = {
+            "customercode": target_customer_code,
+            "channel": DEFAULT_CHANNEL,
+            "openid": self._openid,
+        }
+
+        data = await self._async_post_encrypted(
+            API_URL_CUS_GENERATE_CTOKEN,
+            payload,
+            openid=self._openid,
+            utoken=self._utoken,
+            ctoken="",
+        )
+
+        token = ((data.get("data") or {}).get("token")) or ""
+
+        if not token:
+            raise ShenzhenWaterApiError(
+                f"Ctoken not found in response: {json.dumps(data, ensure_ascii=False)}"
+            )
+
+        self._ctoken = token
+        return token
 
     async def async_get_latest_bill_details(
         self,
@@ -332,20 +335,20 @@ class ShenzhenWaterApi:
         """Fetch latest bill details."""
         if not self._openid:
             raise ShenzhenWaterApiError("openid is required")
-    
+
         if not self._guid:
             raise ShenzhenWaterApiError("guid is required")
-    
+
         if not self._utoken:
             raise ShenzhenWaterApiError("utoken is required")
-    
+
         target_customer_code = customer_code or self._customer_code
         if not target_customer_code:
             raise ShenzhenWaterApiError("customer_code is required")
-    
+
         if not self._ctoken:
             await self.async_generate_ctoken(target_customer_code)
-    
+
         payload = {
             "customerType": "details",
             "customercodelist": [target_customer_code],
@@ -353,7 +356,7 @@ class ShenzhenWaterApi:
             "openid": self._openid,
             "guid": self._guid,
         }
-    
+
         return await self._async_post_encrypted(
             API_URL_GET_LATEST_BILL,
             payload,
@@ -381,7 +384,7 @@ class ShenzhenWaterApi:
             "customerCodes": [
                 {
                     "customercode": self._customer_code,
-                    "billmonth": target_bill_month,
+                    "billmonth": int(target_bill_month),
                 }
             ],
             "channel": DEFAULT_CHANNEL,
@@ -396,12 +399,12 @@ class ShenzhenWaterApi:
         """Fetch bill info."""
         if not self._utoken:
             raise ShenzhenWaterApiError("utoken is required")
-    
+
         if not self._ctoken:
             await self.async_generate_ctoken(self._customer_code)
-    
+
         payload = self._build_bill_payload(bill_month)
-    
+
         return await self._async_post_encrypted(
             API_URL_BILL_INFO,
             payload,
