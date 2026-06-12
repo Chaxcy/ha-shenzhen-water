@@ -225,7 +225,7 @@ class ShenzhenWaterApi:
         payload = {
             "validationType": 4,
             "mobile": mobile,
-            "phoneOld": mobile,
+            "customerType": login,
             "channel": DEFAULT_CHANNEL,
         }
 
@@ -247,8 +247,6 @@ class ShenzhenWaterApi:
         """Login with mobile SMS code."""
         payload = {
             "mobile": mobile,
-            "phoneOld": mobile,
-            "code": sms_code,
             "validationNum": sms_code,
             "validationType": 4,
             "openid": mobile,
@@ -313,6 +311,7 @@ class ShenzhenWaterApi:
             raise ShenzhenWaterApiError("utoken is required")
 
         payload = {
+            "status": 1,
             "channel": DEFAULT_CHANNEL,
             "openid": self._openid,
             "guid": self._guid,
@@ -348,7 +347,8 @@ class ShenzhenWaterApi:
             await self.async_generate_ctoken(target_customer_code)
     
         payload = {
-            "customerCode": target_customer_code,
+            "customerType": "details",
+            "customercodelist": [target_customer_code],
             "channel": DEFAULT_CHANNEL,
             "openid": self._openid,
             "guid": self._guid,
