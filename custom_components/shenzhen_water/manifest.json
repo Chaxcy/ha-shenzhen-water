@@ -1,0 +1,11 @@
+{
+  "domain": "shenzhen_water",
+  "name": "Shenzhen Water",
+  "version": "1.0.0",
+  "documentation": "https://github.com/Chaxcy/ha-shenzhen-water",
+  "issue_tracker": "https://github.com/Chaxcy/ha-shenzhen-water/issues",
+  "codeowners": ["@Chaxcy"],
+  "config_flow": true,
+  "iot_class": "cloud_polling",
+  "requirements": ["pycryptodome==3.23.0"]
+}
