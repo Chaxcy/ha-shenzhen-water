@@ -4,16 +4,22 @@
     "step": {
       "user": {
         "title": "添加深圳水务",
-        "description": "请输入从“环水管家”微信小程序抓取到的账户信息。",
+        "description": "请输入从“环水管家”微信小程序抓取到的 OpenId。集成会自动登录并读取已绑定户号。",
         "data": {
-          "customer_code": "水务户号",
-          "openid": "OpenId",
-          "utoken": "Utoken"
+          "openid": "OpenId"
+        }
+      },
+      "account": {
+        "title": "选择水务户号",
+        "description": "这个 OpenId 绑定了多个户号，请选择要添加到 Home Assistant 的户号。",
+        "data": {
+          "customer_code": "水务户号"
         }
       }
     },
     "error": {
-      "cannot_connect": "连接失败，请检查户号、OpenId 或 Utoken"
+      "cannot_connect": "连接失败，请检查 OpenId",
+      "no_accounts": "这个 OpenId 没有读取到已绑定户号"
     },
     "abort": {
       "already_configured": "该户号已经添加过"
