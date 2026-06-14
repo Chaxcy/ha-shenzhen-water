@@ -25,7 +25,7 @@ class ShenzhenWaterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             customer_code = str(user_input[CONF_CUSTOMER_CODE]).strip()
-            openid = str(user_input[CONF_OPENID]).strip()
+            openid = str(user_input.get(CONF_OPENID, "")).strip()
             guid = str(user_input[CONF_GUID]).strip()
             utoken = str(user_input[CONF_UTOKEN]).strip()
 
@@ -59,7 +59,7 @@ class ShenzhenWaterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         schema = vol.Schema(
             {
                 vol.Required(CONF_CUSTOMER_CODE): str,
-                vol.Required(CONF_OPENID): str,
+                vol.Optional(CONF_OPENID, default=""): str,
                 vol.Required(CONF_GUID): str,
                 vol.Required(CONF_UTOKEN): str,
             }

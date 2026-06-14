@@ -5,7 +5,7 @@
 ## 功能
 
 * 支持 Home Assistant UI 添加集成
-* 使用“环水管家”微信小程序抓包得到的户号、OpenId、GUID、Utoken
+* 使用“环水管家”微信小程序抓包得到的户号、GUID、Utoken
 * 使用小程序账单接口获取本期账单、用水量、水表读数、缴费状态等信息
 * 默认每 6 小时同步一次，避免高频请求
 * 保留原深圳水务实体
@@ -52,7 +52,7 @@ Integration
 4. 搜索“深圳水务”
 5. 输入从“环水管家”微信小程序抓到的：
    * 水务户号
-   * OpenId
+   * OpenId，可留空
    * GUID
    * Utoken
 
@@ -62,7 +62,7 @@ Integration
 
 用 Charles 打开微信小程序“环水管家”，进入账单或户号页面，关注 `szgk.sz-water.com.cn` 下的请求。通常可在请求头或请求体中找到：
 
-* `OpenId`
+* `OpenId`，可留空
 * `Utoken`
 * `guid`
 * `customercode` 或水务户号
