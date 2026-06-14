@@ -3,15 +3,10 @@ from __future__ import annotations
 from datetime import timedelta
 import logging
 
-from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .api import (
-    ShenzhenWaterApi,
-    ShenzhenWaterApiError,
-    ShenzhenWaterAuthExpiredError,
-)
-from .const import DEFAULT_UPDATE_INTERVAL_MINUTES, DOMAIN
+from .api import ShenzhenWaterApi, ShenzhenWaterApiError
+from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -19,71 +14,23 @@ _LOGGER = logging.getLogger(__name__)
 class ShenzhenWaterCoordinator(DataUpdateCoordinator):
     """Shenzhen Water data coordinator."""
 
-    def __init__(
-        self,
-        hass: HomeAssistant,
-        api: ShenzhenWaterApi,
-        update_interval_minutes: int = DEFAULT_UPDATE_INTERVAL_MINUTES,
-    ) -> None:
-        """Initialize Shenzhen Water coordinator."""
+    def __init__(self, hass, api: ShenzhenWaterApi) -> None:
         super().__init__(
             hass,
             _LOGGER,
             name=DOMAIN,
-            update_interval=timedelta(minutes=update_interval_minutes),
+            update_interval=timedelta(minutes=360),
         )
         self.api = api
 
     async def _async_update_data(self):
-        """Fetch latest data."""
         try:
-            # 用 GetLatestBillDetails2V30 作为当前账单数据源。
-            # 这个接口字段更完整，包含 dueDate / paymentStatus / meterWaterUses 等。
-            current = await self.api.async_get_latest_bill_details()
-
-            # 再请求一次当前月份的 BillingInfo，用来拿 prebillmonth。
-            # 这个接口虽然当前字段不够全，但能提供上期月份。
-            current_bill_info = await self.api.async_get_bill_info()
-
-            current_bill_for_previous = {}
-            bill_info_rows = current_bill_info.get("data") or []
-            if bill_info_rows:
-                current_bill_for_previous = bill_info_rows[0]
-
-            previous = None
-            previous_month = current_bill_for_previous.get("prebillmonth")
-
-            if previous_month:
-                try:
-                    previous = await self.api.async_get_bill_info(previous_month)
-                except ShenzhenWaterAuthExpiredError:
-                    raise
-                except Exception as err:
-                    _LOGGER.warning("Failed to fetch previous bill: %s", err)
-
-            return {
-                "current": current,
-                "previous": previous,
-                "current_bill_info": current_bill_info,
-            }
-
-        except ShenzhenWaterAuthExpiredError as err:
-            _LOGGER.error(
-                "Shenzhen Water login expired. Please delete and re-add the "
-                "integration to login again with SMS verification. Detail: %s",
-                err,
-            )
-            raise UpdateFailed(
-                "深圳水务登录已失效，请删除该集成配置项后重新添加，重新获取短信验证码登录。"
-            ) from err
-
+            return await self.api.async_get_all()
         except ShenzhenWaterApiError as err:
-            _LOGGER.error("Shenzhen Water API error: %s", err)
-            raise UpdateFailed(f"深圳水务接口错误：{err}") from err
+            raise UpdateFailed(str(err)) from err
 
     @property
     def bill(self) -> dict:
-        """Return current bill item."""
         data = self.data or {}
         current = data.get("current") or {}
         rows = current.get("data") or []
@@ -93,16 +40,13 @@ class ShenzhenWaterCoordinator(DataUpdateCoordinator):
 
     @property
     def meter(self) -> dict:
-        """Return current meter item."""
-        bill = self.bill
-        meters = bill.get("meterWaterUses") or []
+        meters = self.bill.get("meterWaterUses") or []
         if not meters:
             return {}
         return meters[0]
 
     @property
     def previous_bill(self) -> dict:
-        """Return previous bill item."""
         data = self.data or {}
         previous = data.get("previous") or {}
         rows = previous.get("data") or []
@@ -112,9 +56,7 @@ class ShenzhenWaterCoordinator(DataUpdateCoordinator):
 
     @property
     def previous_meter(self) -> dict:
-        """Return previous meter item."""
-        bill = self.previous_bill
-        meters = bill.get("meterWaterUses") or []
+        meters = self.previous_bill.get("meterWaterUses") or []
         if not meters:
             return {}
         return meters[0]
