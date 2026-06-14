@@ -9,6 +9,7 @@ from .const import (
     CONF_CHANNEL,
     CONF_CUSTOMER_CODE,
     CONF_GUID,
+    CONF_OPENID,
     CONF_TENANT_ID,
     CONF_UTOKEN,
     DEFAULT_CHANNEL,
@@ -26,8 +27,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     api = ShenzhenWaterApi(
         session,
         customer_code=entry.data[CONF_CUSTOMER_CODE],
-        guid=entry.data[CONF_GUID],
         utoken=entry.data[CONF_UTOKEN],
+        openid=entry.data.get(CONF_OPENID, ""),
+        guid=entry.data.get(CONF_GUID, ""),
         tenant_id=entry.data.get(CONF_TENANT_ID, DEFAULT_TENANT_ID),
         channel=entry.data.get(CONF_CHANNEL, DEFAULT_CHANNEL),
     )

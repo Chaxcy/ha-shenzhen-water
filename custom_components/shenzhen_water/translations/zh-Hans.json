@@ -7,13 +7,13 @@
         "description": "请输入从“环水管家”微信小程序抓取到的账户信息。",
         "data": {
           "customer_code": "水务户号",
-          "guid": "GUID",
+          "openid": "OpenId",
           "utoken": "Utoken"
         }
       }
     },
     "error": {
-      "cannot_connect": "连接失败，请检查户号、GUID 或 Utoken"
+      "cannot_connect": "连接失败，请检查户号、OpenId 或 Utoken"
     },
     "abort": {
       "already_configured": "该户号已经添加过"

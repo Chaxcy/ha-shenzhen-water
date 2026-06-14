@@ -8,7 +8,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from .api import ShenzhenWaterApi, ShenzhenWaterApiError
 from .const import (
     CONF_CUSTOMER_CODE,
-    CONF_GUID,
+    CONF_OPENID,
     CONF_UTOKEN,
     DOMAIN,
 )
@@ -24,14 +24,14 @@ class ShenzhenWaterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             customer_code = str(user_input[CONF_CUSTOMER_CODE]).strip()
-            guid = str(user_input[CONF_GUID]).strip()
+            openid = str(user_input[CONF_OPENID]).strip()
             utoken = str(user_input[CONF_UTOKEN]).strip()
 
             session = async_get_clientsession(self.hass)
             api = ShenzhenWaterApi(
                 session,
                 customer_code=customer_code,
-                guid=guid,
+                openid=openid,
                 utoken=utoken,
             )
 
@@ -47,7 +47,7 @@ class ShenzhenWaterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     title=f"深圳水务 {customer_code}",
                     data={
                         CONF_CUSTOMER_CODE: customer_code,
-                        CONF_GUID: guid,
+                        CONF_OPENID: openid,
                         CONF_UTOKEN: utoken,
                     },
                 )
@@ -55,7 +55,7 @@ class ShenzhenWaterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         schema = vol.Schema(
             {
                 vol.Required(CONF_CUSTOMER_CODE): str,
-                vol.Required(CONF_GUID): str,
+                vol.Required(CONF_OPENID): str,
                 vol.Required(CONF_UTOKEN): str,
             }
         )

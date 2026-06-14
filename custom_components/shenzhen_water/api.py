@@ -33,9 +33,9 @@ class ShenzhenWaterApi:
         session: aiohttp.ClientSession,
         *,
         customer_code: str,
-        guid: str,
         utoken: str,
         openid: str = "",
+        guid: str = "",
         tenant_id: str = DEFAULT_TENANT_ID,
         channel: str = DEFAULT_CHANNEL,
     ) -> None:
@@ -121,6 +121,7 @@ class ShenzhenWaterApi:
                 "MicroMessenger/7.0.20"
             ),
             "Utoken": self._utoken,
+            "xweb_xhr": "1",
         }
 
     @staticmethod
@@ -151,7 +152,7 @@ class ShenzhenWaterApi:
                 async with self._session.post(
                     url,
                     headers=self._build_headers(header_value),
-                    data=encrypted_payload,
+                    data=json.dumps(encrypted_payload),
                 ) as resp:
                     text = await resp.text()
 
