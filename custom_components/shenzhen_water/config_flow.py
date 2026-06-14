@@ -9,7 +9,6 @@ from .api import ShenzhenWaterApi, ShenzhenWaterApiError
 from .const import (
     CONF_CUSTOMER_CODE,
     CONF_GUID,
-    CONF_OPENID,
     CONF_UTOKEN,
     DOMAIN,
 )
@@ -25,7 +24,6 @@ class ShenzhenWaterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             customer_code = str(user_input[CONF_CUSTOMER_CODE]).strip()
-            openid = str(user_input.get(CONF_OPENID, "")).strip()
             guid = str(user_input[CONF_GUID]).strip()
             utoken = str(user_input[CONF_UTOKEN]).strip()
 
@@ -33,7 +31,6 @@ class ShenzhenWaterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             api = ShenzhenWaterApi(
                 session,
                 customer_code=customer_code,
-                openid=openid,
                 guid=guid,
                 utoken=utoken,
             )
@@ -50,7 +47,6 @@ class ShenzhenWaterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     title=f"深圳水务 {customer_code}",
                     data={
                         CONF_CUSTOMER_CODE: customer_code,
-                        CONF_OPENID: openid,
                         CONF_GUID: guid,
                         CONF_UTOKEN: utoken,
                     },
@@ -59,7 +55,6 @@ class ShenzhenWaterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         schema = vol.Schema(
             {
                 vol.Required(CONF_CUSTOMER_CODE): str,
-                vol.Optional(CONF_OPENID, default=""): str,
                 vol.Required(CONF_GUID): str,
                 vol.Required(CONF_UTOKEN): str,
             }

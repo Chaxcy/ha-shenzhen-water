@@ -33,9 +33,9 @@ class ShenzhenWaterApi:
         session: aiohttp.ClientSession,
         *,
         customer_code: str,
-        openid: str,
         guid: str,
         utoken: str,
+        openid: str = "",
         tenant_id: str = DEFAULT_TENANT_ID,
         channel: str = DEFAULT_CHANNEL,
     ) -> None:

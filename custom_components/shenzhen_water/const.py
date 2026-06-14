@@ -1,7 +1,6 @@
 DOMAIN = "shenzhen_water"
 
 CONF_CUSTOMER_CODE = "customer_code"
-CONF_OPENID = "openid"
 CONF_GUID = "guid"
 CONF_UTOKEN = "utoken"
 CONF_TENANT_ID = "tenant_id"
